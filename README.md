@@ -19,12 +19,15 @@ Este es un reproductor de música simple creado con Flet y Pygame. Permite repro
 
 2. Crea un entorno virtual y actívalo:
 python -m venv venv
+```sh
 venv\Scripts\activate  # En Windows
 source venv/bin/activate  # En macOS/Linux
+```
 
 3. Instala las dependencias:
+```sh
 pip install -r requirements.txt
-
+```
 USO
  1. Asegúrate de tener una carpeta llamada canciones en el mismo directorio que app.py, y coloca tus archivos MP3 en esa carpeta.
  2. Ejecuta la aplicación:
