@@ -1,34 +1,37 @@
 import flet as ft
 import pygame
 import os
-import asyncio
 from mutagen.mp3 import MP3
+import asyncio
 
 
-class Song:
+
+class Song():
     def __init__(self, filename):
         self.filename = filename
         self.title = os.path.splitext(filename)[0]
-        self.duracion = self.get_duration()
-    
-    def get_duration(self):
-        audio = MP3(os.path.join(os.path.join("canciones", self.filename)))
-        return audio.info.length
+        self.duration = self.get_duration()
 
+    def get_duration(self):
+        audio = MP3(os.path.join("songs", self.filename))
+        return audio.info.length
 
 async def main(page:ft.Page):
     page.title = "Music Player"
-    page.bgcolor = ft.Colors.BLUE_GREY_900
     page.padding = 20
-    titulo = ft.Text("Reproductor de Música", size=30, color=ft.Colors.WHITE)
+
+    ## Music Player
     pygame.mixer.init()
-    playlist = [Song(f) for f in os.listdir("canciones") if f.endswith(".mp3")]
-    
+    pygame.display.init()
+    playlist = [Song(file) for file in os.listdir("songs") if file.endswith(".mp3")]
+    current_song_index = 0
+
     def load_song():
-        pygame.mixer.music.load(os.path.join("canciones",playlist[current_sonf_index].filename))
+        pygame.mixer.music.load(os.path.join("songs",playlist[current_song_index].filename))
         
 
     def play_pause(e):
+        # print(pygame.mixer.music.get_busy())
         if pygame.mixer.music.get_busy():
             pygame.mixer.music.pause()
             play_button.icon = "PLAY_ARROW"
@@ -41,74 +44,78 @@ async def main(page:ft.Page):
             play_button.icon = "PAUSE"
         page.update()
 
-    def change_info(delta):
-        nonlocal current_sonf_index
-        current_sonf_index = (current_sonf_index + delta) % len(playlist)
+    def update_song_info():
+        song = playlist[current_song_index]
+        song_title.value = song.title
+        duration.value = format_time(song.duration)
+        progress_bar.value = 0.0
+        current_time_text.value = "00:00"
+        page.update()
+
+    def change_song_info(e):
+        nonlocal current_song_index
+        current_song_index = (current_song_index + e) % len(playlist)
         load_song()
         pygame.mixer.music.play()
         update_song_info()
         play_button.icon = "PAUSE"
         page.update()
     
-    def update_song_info():
-        song = playlist[current_sonf_index]
-        sonf_info.value = f"{song.title}"
-        duration.value = format_time(song.duracion)
-        progress_bar.value = 0.0
-        current_time_text.value = "00:00"
-        page.update()
-    
     def format_time(seconds):
         minutes , seconds = divmod(int(seconds), 60)
-        return "{minutes:02d}:{seconds:02d}".format(minutes=minutes, seconds=seconds)
-
+        return f"{minutes:02d}:{seconds:02d}"
+    
     async def update_progress_bar():
         while True:
             if pygame.mixer.music.get_busy():
                 current_time = pygame.mixer.music.get_pos() / 1000
-                progress_bar.value = current_time / playlist[current_sonf_index].duracion
+                progress_bar.value = current_time / playlist[current_song_index].duration
                 current_time_text.value = format_time(current_time)
                 page.update()
+            else:
+                if auto_play_checkbox.value and pygame.mixer.music.get_pos() == -1:
+                    change_song_info(1)
             await asyncio.sleep(1)
 
-    current_sonf_index = 0
+    def set_volume(e):
+        pygame.mixer.music.set_volume(volumen_slider.value / 100)
+        page.update()
 
-    sonf_info = ft.Text(size=20, color=ft.Colors.WHITE)
-    current_time_text = ft.Text(value="00:00",size=20, color=ft.Colors.WHITE60)
-    duration = ft.Text(value="00:00",size=20, color=ft.Colors.WHITE60)
+    song_title = ft.Text( size=30 , weight=ft.FontWeight.W_700)
+    play_button = ft.IconButton(icon="PLAY_ARROW", on_click= lambda e: play_pause(e))
+    prevet_button = ft.IconButton(icon="SKIP_PREVIOUS", on_click= lambda _: change_song_info(-1))
+    next_button = ft.IconButton(icon="SKIP_NEXT", on_click= lambda _: change_song_info(1))
 
 
-    progress_bar = ft.ProgressBar(value=0.0, width=300, color="white", bgcolor="red")
+    progress_bar = ft.ProgressBar(value=0.0, width=300, bgcolor="red")
+    duration = ft.Text(value="0:00", size=20)
+    current_time_text = ft.Text(value="0:00", size=20)
+    auto_play_checkbox = ft.CupertinoSwitch(label="Auto Play", value=False)
+    volumen_slider = ft.Slider(min=0, max=100, value=50, width=300 , on_change=set_volume)
 
-
-    play_button = ft.IconButton(icon="PLAY_ARROW",icon_color="white", on_click=play_pause)
-    prevet_button = ft.IconButton(icon="SKIP_PREVIOUS",icon_color="white", on_click=lambda _: change_info(-1))
-    next_button = ft.IconButton(icon="SKIP_NEXT",icon_color="white", on_click=lambda _: change_info(1))
-
-    controls = ft.Row(
-        controls=[prevet_button, play_button, next_button],
+    list_controls = ft.Row(
+        controls= [prevet_button, play_button, next_button, auto_play_checkbox],
         alignment=ft.MainAxisAlignment.CENTER,
     )
-
-    fila_reproduccion = ft.Row(
-        controls=[current_time_text, progress_bar, duration],
+    info_reproduction = ft.Row(
+        controls=[current_time_text,progress_bar, duration],
         alignment=ft.MainAxisAlignment.CENTER,
     )
+    
+    columna = ft.Column(
+        controls=[song_title,info_reproduction, list_controls],
+        alignment=ft.MainAxisAlignment.CENTER,
+        spacing=40
+    )
+    volume = ft.Row(
+        controls=[volumen_slider],
+        alignment=ft.MainAxisAlignment.CENTER,
+    )
+    page.add(columna,volume)
 
-
-    columna = ft.Column([sonf_info, fila_reproduccion,controls],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                        spacing=20)
-    page.add(
-        columna
-        )
     if playlist:
-        load_song()
         update_song_info()
         page.update()
         await update_progress_bar()
-    else:
-        sonf_info.value = "No hay canciones"
-        page.update()
 
 ft.app(target=main)
